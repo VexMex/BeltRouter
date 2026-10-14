@@ -1,6 +1,6 @@
 # BeltRouter Lite
 
-Factorio mod for automatically routing belts and pipes. Imported version: **2.7.0**, for Factorio **2.0**. The mod's original name, metadata, source files and images are unchanged.
+Factorio mod for automatically routing belts and pipes. Imported version: **2.7.0**, for Factorio **2.0**. The mod's original name, metadata, executable code and images are unchanged. English comments explain the Lua files for readers new to the project.
 
 ## Origin and license
 
@@ -26,4 +26,8 @@ A separate `BeltRouter-lite-history.bundle` and metadata files were saved with t
 | [66f6b35a](https://github.com/PlexPt/small-factorio-mods/commit/66f6b35a30f992ae4e1f588c73e3d16c5dfbceb2) | `1b9976e19833f5803ce21e23e6a9c19e7bbdd03b` | [699107f4](https://github.com/VexMex/BeltRouter/commit/699107f4fb1c89f9200c46bd7b8d6b9a619f9fea) | 2024-11-16T01:38:40+08:00 | up |
 | [1df740a4](https://github.com/PlexPt/small-factorio-mods/commit/1df740a414320eb9b24bf46333081cc27fabb060) | `d933ec1d943a333af0700a930540a78facd179e1` | [4e6350a4](https://github.com/VexMex/BeltRouter/commit/4e6350a44c8ff872c0d0e67d1d565f4afb96c076) | 2024-12-10T03:01:56+08:00 | up |
 
-The final 30 imported files were verified by their Git blob IDs against the pinned source directory. Repository documentation and license notices were added separately; mod code was not changed.
+At import, all 30 mod files were verified by their Git blob IDs against the pinned source directory. Later English explanations were added as Lua comments only; every original source line was preserved and no executable code was changed.
+
+## Reading the code
+
+Start with `control.lua` for player input and placement, then `transport_line_connector.lua` for the weighted A* search. `path_find/path_segment.lua` describes possible building steps, and `path_find/path_node.lua` explains their costs and saved route links. The remaining Lua files include short explanations of transport rules, settings and helper functions.
