@@ -1,3 +1,6 @@
+-- Runtime entry point. Player input selects endpoints, then starts the route search.
+-- This file also turns the chosen route into build ghosts and handles waypoint mode.
+
 --belt_old_directions = {
 --    north = 0,
 --    northeast = 1,
@@ -46,6 +49,7 @@ local playerSelectedStartingPositions = {}
 --- @type table<player_index, LineConnectConfig>
 local playerLastRoutingConfig = {}
 
+-- Choose which development messages are visible, based on release mode.
 local function setupLogging()
     for category, enable in pairs(loggingCategories) do
         logging.addCategory(category, releaseMode and false or enable)
@@ -57,6 +61,7 @@ local function setupLogging()
     end
 end
 
+-- Add a supported piece to this player's start queue, or unselect it if already selected.
 local function setStartingTransportLine(player, selectedEntity)
     if not selectedEntity then
         return
@@ -80,6 +85,7 @@ local function setStartingTransportLine(player, selectedEntity)
     end
 end
 
+-- Read the player and the piece under the cursor from the input event.
 local function triggerSetStartingTransportLine(event)
     local player = game.players[event.player_index]
     local selectedEntity = player.selected
@@ -89,6 +95,8 @@ end
 --- @param selectedEntity LuaEntity
 --- @param player LuaPlayer
 --- @param config LineConnectConfig
+-- Take the oldest selected start and connect it to the chosen destination.
+-- Prepare the game-specific functions the route planner needs for checking and placing pieces.
 local function setEndingTransportLine(player, selectedEntity, config)
     local player_index = player.index
     if not selectedEntity then
@@ -101,6 +109,7 @@ local function setEndingTransportLine(player, selectedEntity, config)
     if not EntityRoutingAttribute.from(entityName) then
         return
     end
+    -- Take starts in the order the player selected them.
     local startingEntity
     if playerSelectedStartingPositions[player_index] then
         startingEntity = playerSelectedStartingPositions[player_index]:pop()
@@ -115,6 +124,8 @@ local function setEndingTransportLine(player, selectedEntity, config)
     logging.log("preferLongestUnderground = " .. tostring(settings.get_player_settings(player)["prefer-longest-underground"].value))
     logging.log("build line with config: " .. serpent.line(config))
     local surface = player.surface
+    -- Use Factorio's ghost-placement check on a one-tile belt as a general space check.
+    -- The force-build option may allow obstacles that can be marked for removal.
     local function canPlace(position)
         local forced = settings.get_player_settings(player)["force-build"].value
         return surface.can_place_entity {
@@ -127,9 +138,12 @@ local function setEndingTransportLine(player, selectedEntity, config)
     end
     local num = 1
     --- @param entity LuaEntity
+    -- Convert one planned placement into an actual game operation.
     local function place(entity)
+        -- Work on a copy so placement details do not modify the route stored by the search.
         entity = Copy.deep_copy(entity)
         entity.force = player.force
+        -- Normally create ghosts. Real pieces are only placed directly when cheat mode allows it.
         if (not player.cheat_mode or not settings.get_player_settings(player)["cheat-mode-place-real-entity"].value) and entity.name ~= "entity-ghost" and entity.name ~= "speech-bubble" then
             entity.inner_name = entity.name
             entity.name = "entity-ghost"
@@ -138,6 +152,7 @@ local function setEndingTransportLine(player, selectedEntity, config)
         -- This tells game to raise build event so that the action could potentially be caught by other mods
         entity.raise_built = true
         -- checks for colliding trees/cliffs
+        -- Mark nearby colliding objects for removal before creating this piece.
         local collidingEntities = surface.find_entities({ { entity.position.x - 0.4, entity.position.y - 0.4 }, { entity.position.x + 0.4, entity.position.y + 0.4 } })
         if collidingEntities then
             for _, collidingEntity in ipairs(collidingEntities) do
@@ -153,6 +168,7 @@ local function setEndingTransportLine(player, selectedEntity, config)
             num = num + 1
         end
     end
+    -- Find nearby transport pieces for interference checks, including existing ghosts.
     local function getEntity(position)
         -- radius 0.5 so that we can capture 2-block wide entities like splitter
         for _, entity in pairs(surface.find_entities_filtered { position = position, radius = 0.5 }) do
@@ -172,6 +188,7 @@ local function setEndingTransportLine(player, selectedEntity, config)
             end
         end
     end
+    -- Give the planner the three game callbacks: can place, place, and look up a neighbor.
     local transportLineConstructor = TransportLineConnector.new(canPlace, place, getEntity, taskManager)
     transportLineConstructor:buildTransportLine(startingEntity, selectedEntity, taskManager, config, player)
 
@@ -181,6 +198,7 @@ end
 
 --- helper function
 --- @param config LineConnectConfig
+-- Create an input handler with a preset routing mode, such as forbidding underground pieces.
 local function triggerSetEndingTransportLineWithConfigHelper(config)
     return function(event)
         local player = game.players[event.player_index]
@@ -188,6 +206,7 @@ local function triggerSetEndingTransportLineWithConfigHelper(config)
     end
 end
 
+-- Remove a start marker when the selected piece is mined or marked for removal.
 local function tryRemoveSelectedStartingPoint(eventWithEntity)
     local player_index = eventWithEntity.player_index
     --- @type LuaEntity
@@ -199,6 +218,7 @@ end
 
 --- @param player LuaPlayer
 --- @return LineConnectConfig
+-- Choose which routing preferences waypoint mode should use.
 local function getWaypointRoutingConfig(player)
     local configSetting = settings.get_player_settings(player)["waypoint-mode-routing-mode"].value
     if configSetting == ("last-mode") then
@@ -221,6 +241,7 @@ local function getWaypointRoutingConfig(player)
     end
 end
 
+-- Toggle automatic chaining; switching it off also clears the selected starts.
 local function toggleWaypointMode(event)
     if event.prototype_name and event.prototype_name ~= "toggle-waypoint-mode" then
         return
@@ -237,6 +258,7 @@ local function toggleWaypointMode(event)
     end
 end
 
+-- When a supported piece is built in waypoint mode, connect to it and make it the next start.
 local function tryUseWaypointMode(event)
     local player = game.players[event.player_index]
     if not player.is_shortcut_toggled("toggle-waypoint-mode") then
@@ -259,12 +281,15 @@ local function tryUseWaypointMode(event)
     setStartingTransportLine(player, event.entity)
 end
 
+-- Clear the shared task queue, stopping pending searches for all players.
 local function terminatePathFinding(event)
     taskManager:removeAllTasks()
     game.players[event.player_index].print { "info-message.terminate-path-finding" }
 end
 
+-- Connect input/build events to their handlers and let queued searches advance on each tick.
 local function main()
+    -- Match the custom input names from data.lua to the functions above.
     script.on_event("select-line-starting-point", triggerSetStartingTransportLine)
     script.on_event("build-transport-line", triggerSetEndingTransportLineWithConfigHelper { allowUnderground = true, preferOnGround = false })
     script.on_event("build-transport-line-no-underground", triggerSetEndingTransportLineWithConfigHelper { allowUnderground = false, preferOnGround = true })

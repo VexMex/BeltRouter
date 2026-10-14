@@ -1,3 +1,7 @@
+-- A reusable list whose entries are joined by previous/next links.
+-- Each node stores {value, previousNode, nextNode}; it does not calculate routes.
+-- This helper is not imported by the current routing modules.
+
 -- Adapted from https://github.com/iskolbin/linkedlist/blob/master/LinkedList.lua
 
 local assert, abs, setmetatable = assert, math.abs, setmetatable
@@ -6,10 +10,12 @@ local assert, abs, setmetatable = assert, math.abs, setmetatable
 --- @type LinkedList
 local LinkedList = {}
 
+-- A shared marker means "no neighbor"; it is different from Lua's nil value.
 local Nil = {}
 
 local LinkedListMt
 
+-- Create a list and, if given an array, link its values together in order.
 function LinkedList.new( array )
     local self = {
         _head = Nil,
@@ -35,6 +41,7 @@ function LinkedList.new( array )
     return setmetatable( self, LinkedListMt )
 end
 
+-- Copy the node structure into a new list; stored values themselves are still shared.
 function LinkedList:copy()
     local result = LinkedList.new()
     local node = self._head
@@ -45,6 +52,7 @@ function LinkedList:copy()
     return result
 end
 
+-- Read a numbered value; positive indexes count from the front, negative ones from the back.
 function LinkedList:index( i )
     local len = self._length
     assert( abs(i) - 1 <= len and i ~= 0, 'bad argument #1 to \'index\' (position out of bounds)')
@@ -64,6 +72,7 @@ function LinkedList:index( i )
 end
 
 
+-- Find a numbered node and replace its stored value.
 function LinkedList:set( i, v )
     local len = self._length
     assert( abs(i) - 1 <= len and i ~= 0, 'bad argument #1 to \'index\' (position out of bounds)')
@@ -82,6 +91,7 @@ function LinkedList:set( i, v )
     node[1] = v
 end
 
+-- Accept insert(value) or insert(index, value), then join a new node to its neighbors.
 function LinkedList:insert( i_or_v, v_ )
     assert( i_or_v ~= nil, 'wrong number of arguments to \'insert\'' )
     local v = v_ or i_or_v
@@ -131,6 +141,7 @@ function LinkedList:insert( i_or_v, v_ )
     return self
 end
 
+-- Remove a numbered node and reconnect its neighbors; the default is the last node.
 function LinkedList:remove( i_ )
     local i = i_ or -1
     local len = self._length
@@ -177,16 +188,19 @@ function LinkedList:remove( i_ )
             end
 
             local v = node[1]
+            -- Join the previous and next nodes directly so the removed node is no longer in the chain.
             node[2][3], node[3][2] = node[3], node[2]
             return v
         end
     end
 end
 
+-- Return the saved entry count instead of walking through all nodes.
 function LinkedList:len()
     return self._length
 end
 
+-- Swap each node's previous/next links, then swap the front and back pointers.
 function LinkedList:reverse()
     local len = self._length
     if len > 1 then
@@ -201,6 +215,7 @@ function LinkedList:reverse()
     return self
 end
 
+-- Copy the selected range of values into a new linked list.
 function LinkedList:sub( i, j_ )
     local len = self._length
     assert( abs(i) <= len, 'bad argument #2 to \'sub\' (position out of bounds)')
@@ -241,6 +256,7 @@ function LinkedList:sub( i, j_ )
     return result
 end
 
+-- Walk forward through the nodes and format their values as text.
 function LinkedList:tostring()
     local t, node = {}, self._head
     for i = 1, self._length do
@@ -249,6 +265,7 @@ function LinkedList:tostring()
     return '{' .. table.concat( t, ',' ) .. '}'
 end
 
+-- Walk forward through the nodes and put their values into a normal Lua list.
 function LinkedList:toarray()
     local t, node = {}, self._head
     for i = 1, self._length do
@@ -257,32 +274,39 @@ function LinkedList:toarray()
     return t
 end
 
+-- Insert a value at the front.
 function LinkedList:pushhead( v )
     return self:insert( 1, v )
 end
 
+-- This helper name is defined twice below; the later definition replaces the earlier one.
 function LinkedList:pophead( v )
     return self:remove( 1, v )
 end
 
+-- Insert a value at the back.
 function LinkedList:pushtail( v )
     return self:insert( -1, v )
 end
 
+-- This helper name is defined twice below; the later definition replaces the earlier one.
 function LinkedList:pophead( v )
     return self:remove( -1, v )
 end
 
+-- Read the last value without removing it.
 function LinkedList:peektail()
     assert( self._length > 0, 'list is empty' )
     return self._tail[1]
 end
 
+-- Read the first value without removing it.
 function LinkedList:peekhead()
     assert( self._length > 0, 'list is empty' )
     return self._head[1]
 end
 
+-- Advance one node and return its numbered value for list iteration.
 local function ipairsiter( state, index )
     local node = state[1]
     if node ~= Nil then
@@ -291,10 +315,12 @@ local function ipairsiter( state, index )
     end
 end
 
+-- Return an iterator that follows next-node links and produces numbered values.
 function LinkedList:ipairs()
     return ipairsiter, {self._head}, 0
 end
 
+-- Attach the other list's nodes to this list, then empty the other list.
 function LinkedList:merge( list )
     local len = list._length
     if len > 0 then
@@ -308,6 +334,7 @@ function LinkedList:merge( list )
     return self
 end
 
+-- Provide familiar alternative names for the operations above; these are method aliases.
 LinkedList.push = LinkedList.pushtail
 LinkedList.pop = LinkedList.poptail
 LinkedList.enqueue = LinkedList.pushhead

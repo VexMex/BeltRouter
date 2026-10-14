@@ -1,3 +1,7 @@
+-- Reusable helpers for creating GUI elements and routing their events to callbacks.
+-- A callback is a function called when an event happens, such as a button click.
+-- The current routing entry point does not import this helper.
+
 --- @type ArrayList
 local ArrayList = require("array_list")
 local assertNotNull = require("assert_not_null")
@@ -25,6 +29,7 @@ GuiLib.rootName = "left"
 
 --- This function should be called in control.lua. Should be called in control.lua to initialize all events to be listened.
 --- @param event defines.events
+-- Register one GUI event; try shared handlers first, then this player's handlers.
 function GuiLib.listenToEvent(event)
     GuiLib.listeningEvents:add(event)
     GuiLib.guiHandlers[event] = {}
@@ -34,6 +39,7 @@ function GuiLib.listenToEvent(event)
             return
         end
         -- handle persistent events
+        -- Shared handlers take precedence over handlers registered for one player.
         for path, handler in pairs(GuiLib.globalGuiHandlers[event]) do
             if GuiLib.path_of(e.element) == path then
                 handler(e)
@@ -57,6 +63,7 @@ end
 
 --- Helper function for listenToEvent. Should be called in control.lua to initialize all events to be listened.
 --- @param event_list defines.events[]
+-- Register each GUI event in the supplied list.
 function GuiLib.listenToEvents(event_list)
     for _, event in ipairs(event_list) do
         GuiLib.listenToEvent(event)
@@ -64,6 +71,7 @@ function GuiLib.listenToEvents(event_list)
 end
 
 --- @param elementName string
+-- Store event callbacks under an element path for use by every player.
 function GuiLib.registerGuiHandlerForAllPlayers(elementName, event_to_handler_table)
     assertNotNull(elementName, event_to_handler_table)
     for event, handler in ipairs(event_to_handler_table) do
@@ -77,6 +85,7 @@ end
 --- @param element_spec LuaGuiElement gui element specification table, but not an actual gui element
 --- @param event_to_handler_table table<defines.events, EventHandler>
 --- @return LuaGuiElement
+-- Create a GUI element and register its supplied callbacks. The element is not returned here.
 function GuiLib.addGuiElementWithHandler(gui_parent, element_spec, event_to_handler_table)
     assertNotNull(gui_parent, element_spec)
     local newElement = gui_parent.add(element_spec)
@@ -91,12 +100,14 @@ end
 --- @param guiElement LuaGuiElement
 --- @param event defines.events
 --- @param handler fun(e)
+-- Remember which function handles this player's element for this event.
 function GuiLib.registerGuiHandler(guiElement, event, handler)
     assertNotNull(guiElement, event, handler)
     assert(type(handler) == "function", "handler should be a function")
     assert(guiElement.name ~= "", "gui's name can't be nil")
     assert(GuiLib.guiHandlers[event] ~= nil, "event is not listened, please call GuiLib.listenToEvent(event) first")
 
+    -- Save the element's path rather than relying on its current object reference.
     local gui_path = GuiLib.path_of(guiElement)
     for _, elem_name in pairs(GuiLib.__split_path(gui_path)) do
         assert(elem_name ~= "", "there is an element in path of " .. guiElement.name .. "without name")
@@ -109,6 +120,7 @@ end
 
 --- @param element LuaGuiElement
 --- @param event defines.events
+-- Forget the callback for one element and event.
 function GuiLib.unregisterGuiHandler(element, event)
     assertNotNull(element, event)
     GuiLib.guiHandlers[event][element.player_index][GuiLib.path_of(element)] = nil
@@ -116,6 +128,7 @@ end
 
 --- Unregister all handlers of gui element as well as its children.
 --- @param element LuaGuiElement
+-- Walk through the element and its children to remove their registered callbacks.
 function GuiLib.unregisterAllHandlers(element)
     assert(element)
     local player_index = element.player_index
@@ -130,6 +143,7 @@ function GuiLib.unregisterAllHandlers(element)
 end
 
 --- @return LuaGuiElement root gui of player for this mod
+-- Find this player's left-side GUI container.
 function GuiLib.gui_root(player_index)
     assertNotNull(player_index)
 
@@ -140,6 +154,7 @@ end
 
 --- @param element LuaGuiElement
 --- @return boolean true if remove is successful
+-- Remove its callbacks before destroying the GUI element.
 function GuiLib.removeGuiElement(element)
     if element ~= nil then
         GuiLib.unregisterAllHandlers(element)
@@ -150,6 +165,7 @@ function GuiLib.removeGuiElement(element)
 end
 
 --- @return boolean true if remove is successful
+-- Find a named child of the GUI root and remove it if present.
 function GuiLib.removeGuiElementWithName(player_index, element_name)
     assertNotNull(player_index, element_name)
     local element = GuiLib.gui_root(player_index)[element_name]
@@ -161,6 +177,7 @@ end
 
 --- @param gui_elem LuaGuiElement
 --- @return string the path of a gui element represented by "root_name|parent_name|my_name ..."
+-- Build a stable text path from parent and child names, separated by |.
 function GuiLib.path_of(gui_elem)
     assertNotNull(gui_elem)
 
@@ -175,6 +192,7 @@ function GuiLib.path_of(gui_elem)
 end
 
 --- returns the path of a gui element represented by a list in order of [elem_name, parent_name, ... , root_name]
+-- Split the text path into its individual element names.
 function GuiLib.__split_path(str)
     local t = {}
     for s in string.gmatch(str, "([^|]+)") do
@@ -186,6 +204,7 @@ end
 --- @param path string guilib path for the GuiElement
 --- @param player_index player_index
 --- @return LuaGuiElement
+-- Follow the names from the GUI root to find an element, or return nil if a step is missing.
 function GuiLib.elem_of(path, player_index)
     assertNotNull(path, player_index)
 

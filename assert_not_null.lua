@@ -1,3 +1,6 @@
+-- Stop with an error if a required argument is missing (nil).
+-- False and zero are allowed; the check counts values rather than testing truthiness.
+
 --- raises error if any value is nil
 return function(...)
     local n = select("#", ...)
