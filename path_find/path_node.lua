@@ -47,22 +47,25 @@ function PathNode:new(pathUnit, prevChain, playerConfig)
         distanceIncrease = distanceIncrease + (playerConfig.turningPunishment or 2)
     end
     if prevChain then
-        -- This calculation still uses the old 8-value direction scheme; it is not converted here.
-        local directionDifference = (pathUnit.direction - prevChain.pathUnit.direction + 4) % 8 - 4
+        -- Factorio uses 16 direction values: a quarter turn is 4, not 2.
+        -- Treating a normal corner as a U-turn would trigger costly full-route checks.
+        local halfTurn = defines.direction.south
+        local quarterTurn = defines.direction.east
+        local directionDifference = (pathUnit.direction - prevChain.pathUnit.direction + halfTurn) % (halfTurn * 2) - halfTurn
         local leftTurnNum = prevChain.leftCumulativeTurns
         local rightTurnNum = prevChain.rightCumulativeTurns
         local enforceCollisionCheck = prevChain.enforceCollisionCheck
         -- Track turns until the route might loop, then leave full collision checking enabled.
         if not enforceCollisionCheck then
-            if directionDifference == 2 then
+            if directionDifference == quarterTurn then
                 -- right turn
                 rightTurnNum = rightTurnNum + 1
                 leftTurnNum = leftTurnNum == 0 and leftTurnNum or leftTurnNum - 1
-            elseif directionDifference == -2 then
+            elseif directionDifference == -quarterTurn then
                 -- left turn
                 leftTurnNum = leftTurnNum + 1
                 rightTurnNum = rightTurnNum == 0 and rightTurnNum or rightTurnNum - 1
-            elseif directionDifference <= -4 or directionDifference >= 4 then
+            elseif math.abs(directionDifference) == halfTurn then
                 -- 180 degree turn
                 enforceCollisionCheck = true
             end
