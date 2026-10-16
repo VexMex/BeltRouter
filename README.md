@@ -1,6 +1,8 @@
 # BeltRouter Lite
 
-Factorio mod for automatically routing belts and pipes. Imported version: **2.7.0**, for Factorio **2.0**. The mod's original name, metadata and images are preserved. English comments explain the Lua files for readers new to the project. The routing implementation includes allocation and caching improvements while keeping the backward Weighted A* search and its existing settings.
+Current version: **3.0.0**.
+
+Factorio mod for automatically routing belts and pipes. Imported version: **2.7.0**, for Factorio **2.0**. The mod's original name, attribution and images are preserved. English comments explain the Lua files for readers new to the project. The routing implementation includes allocation and caching improvements while keeping the backward Weighted A* search and its existing settings.
 
 ## Origin and license
 

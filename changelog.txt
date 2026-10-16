@@ -1,4 +1,16 @@
 ---------------------------------------------------------------------------------------------------
+Version: 3.0.0
+Date: 2026.10.16
+  Optimizations:
+    - Reduce temporary allocations, repeated map queries, and disabled debug formatting.
+    - Keep the existing Weighted A* search and the default 15 search steps per tick.
+  Bugfixes:
+    - Correct direction handling for turns, underground crossings, and pump/splitter footprints.
+    - Recheck completed routes before placement and cancel outdated connections.
+  Features:
+    - Add beginner-friendly English code comments and Lua regression tests.
+
+---------------------------------------------------------------------------------------------------
 Version: 2.7.0
 Date: 2024.12.13
   Bugfixes:
