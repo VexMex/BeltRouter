@@ -1,6 +1,6 @@
 # BeltRouter Lite
 
-Current version: **3.0.0**.
+Current version: **3.1.0**.
 
 Factorio mod for automatically routing belts and pipes. Imported version: **2.7.0**, for Factorio **2.0**. The mod's original name, attribution and images are preserved. English comments explain the Lua files for readers new to the project. The routing implementation includes allocation and caching improvements while keeping the backward Weighted A* search and its existing settings.
 
@@ -10,7 +10,7 @@ Extracted on 2026-10-14 from [PlexPt/small-factorio-mods](https://github.com/Ple
 
 Only this directory's contents were moved into the repository root. The source repository was not modified. This is an independent repository, rather than a GitHub fork of the complete collection.
 
-The source repository supplies the [GNU GPL version 3](https://github.com/PlexPt/small-factorio-mods/blob/5c22602665f0bda74461f425b607a70291764a37/LICENSE). The existing GPL-3.0 `LICENSE` in this repository was retained unchanged. Original authorship notices remain in the files. The imported history identifies **plexpt**, the mod metadata identifies **pt**, and numerous files credit **seancheey**. The original homepage is [Seancheey/FactorioBeltRouter](https://github.com/Seancheey/FactorioBeltRouter). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the linked-list library's MIT notice.
+The source repository supplies the [GNU GPL version 3](https://github.com/PlexPt/small-factorio-mods/blob/5c22602665f0bda74461f425b607a70291764a37/LICENSE). The existing GPL-3.0 `LICENSE` in this repository was retained unchanged. Original authorship notices remain in the files. The imported history identifies **plexpt**, the mod metadata identifies **pt**, and numerous files credit **seancheey**. The original homepage is [Seancheey/FactorioBeltRouter](https://github.com/Seancheey/FactorioBeltRouter). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for historical third-party attribution.
 
 ## History extraction
 
@@ -32,7 +32,7 @@ At import, all 30 mod files were verified by their Git blob IDs against the pinn
 
 ## Reading the code
 
-Start with `control.lua` for player input and placement, then `transport_line_connector.lua` for the weighted A* search. `path_find/path_segment.lua` describes possible building steps, and `path_find/path_node.lua` explains their costs and saved route links. The remaining Lua files include short explanations of transport rules, settings and helper functions.
+Start with `control.lua` for player input and placement, then `transport_line_connector.lua` for the weighted A* search. `path_find/path_segment.lua` describes possible building steps, and `path_find/path_node.lua` explains their costs and saved route links. The remaining Lua files include short explanations of transport rules, settings and helper functions. Direction and neighbor helpers live in `direction_helper.lua`; shared transport labels live in `enum/transport_types.lua`. Development-output settings live in `logging.lua`. Unused imported modules and unused utility methods were removed in version 3.1.0.
 
 ## Routing performance and checks
 

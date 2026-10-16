@@ -192,4 +192,58 @@ test("underground-enabled belt routing and surface pipe routing still finish", f
     env.begin(0,0,20,0,false,"pipe"); env.finish(); eq(#env.placed,19)
 end)
 
+test("control entry point connects player selections and places ghosts", function()
+    local env=Support.fresh()
+    -- Do not let test globals hide a missing dependency in the game entry point.
+    DirectionHelper=nil
+    belt_old_directions=nil
+    defines.events={on_player_mined_entity=1,on_marked_for_deconstruction=2,
+        on_lua_shortcut=3,on_built_entity=4}
+    defines.build_check_type={ghost_place=1}
+    local handlers, tickHandler={}
+    script={active_mods={},on_event=function(event,handler) handlers[event]=handler end,
+        on_nth_tick=function(interval,handler) eq(interval,1); tickHandler=handler end}
+    local function drawing()
+        local result={valid=true}
+        result.destroy=function() result.valid=false end
+        return result
+    end
+    rendering={draw_rectangle=function(_) return drawing() end,
+        draw_text=function(_) return drawing() end}
+    env.options["turning-punishment"]=2
+    env.options["prefer-ground-mode-underground-punishment"]=5
+    env.options["prefer-longest-underground"]=true
+    env.options["force-build"]=true
+    env.options["cheat-mode-place-real-entity"]=true
+    env.player.index=1; env.player.force={}; env.player.cheat_mode=false
+    env.player.surface={
+        can_place_entity=function(spec) return env.canPlace(spec.position) end,
+        find_entities_filtered=function(spec)
+            local entity=env.getEntity(spec.position)
+            return entity and {entity} or {}
+        end,
+        find_entities=function(_) return {} end,
+        create_entity=function(spec) env.place(spec) end
+    }
+    game.players={[1]=env.player}
+    package.loaded.control=nil
+    require("control")
+    eq(require("logging").releaseMode,true)
+    eq(DirectionHelper,nil); eq(belt_old_directions,nil)
+    local start=env.entity(0,0,4)
+    start.selection_box={left_top={x=0,y=0},right_bottom={x=1,y=1}}
+    local goal=env.entity(30,0,4)
+    env.player.selected=start
+    handlers["select-line-starting-point"]({player_index=1})
+    env.player.selected=goal
+    handlers["build-transport-line-no-underground"]({player_index=1})
+    eq(#env.placed,0)
+    for tick=1,2 do game.tick=tick; tickHandler() end
+    eq(#env.placed,29)
+    for _,spec in ipairs(env.placed) do
+        eq(spec.name,"entity-ghost"); eq(spec.inner_name,"transport-belt")
+        eq(spec.direction,4); eq(spec.force,env.player.force); eq(spec.raise_built,true)
+    end
+end)
+
 print("Passed " .. total .. " tests.")

@@ -19,6 +19,7 @@ Coverage includes:
 - The existing 15-step search batch limit.
 - Final validation after obstacles or interfering belts are added between batches.
 - Endpoint deletion/rotation, four-direction belt routes, pipes and underground routing.
+- The real `control.lua` entry point: input handlers, start selection and ghost placement.
 
 The search remains backward Weighted A*: heuristic weights, route costs, successor
 generation and minimum-cost pruning are unchanged. `settings.lua` and

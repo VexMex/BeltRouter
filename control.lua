@@ -1,18 +1,6 @@
 -- Runtime entry point. Player input selects endpoints, then starts the route search.
 -- This file also turns the chosen route into build ghosts and handles waypoint mode.
 
---belt_old_directions = {
---    north = 0,
---    northeast = 1,
---    east = 2,
---    southeast = 3,
---    south = 4,
---    southwest = 5,
---    west = 6,
---    northwest = 7
---}
-belt_old_directions = defines.direction
-
 --- @alias player_index number
 
 --- @type Copier
@@ -28,7 +16,7 @@ local SelectionQueue = require("selection_queue")
 --- @type TransportLineConnector
 local TransportLineConnector = require("transport_line_connector")
 --- @type boolean
-local releaseMode = require("release")
+local releaseMode = logging.releaseMode
 
 --- @type table<string, boolean> simple table for easy toggling debugging groups
 local loggingCategories = {
@@ -36,8 +24,6 @@ local loggingCategories = {
     placing = false,
     transportType = false
 }
-
-DirectionHelper = require("direction_helper")
 
 --- async task manager for path finder
 local taskManager = AsyncTaskManager:new()
@@ -164,8 +150,6 @@ local function setEndingTransportLine(player, selectedEntity, config)
             end
         end
 
-        entity.direction = DirectionHelper.convert_direction_reverse(entity.direction)
-
         surface.create_entity(entity)
         if not releaseMode then
             player.create_local_flying_text { text = tostring(num), position = entity.position, time_to_live = 100000, speed = 0.000001 }
@@ -183,7 +167,7 @@ local function setEndingTransportLine(player, selectedEntity, config)
                 if entity.name == "entity-ghost" then
                     entity = {
                         name = entity.ghost_name,
-                        direction = DirectionHelper.convert_direction(entity.direction),
+                        direction = entity.direction,
                         position = entity.position,
                         type = entity.type,
                     }

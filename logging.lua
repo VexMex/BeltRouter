@@ -12,6 +12,10 @@
 --- @type Logger
 local logging = {}
 
+-- Normal play hides development labels and tracing. Set false when debugging.
+-- This is the same switch previously returned by release.lua.
+logging.releaseMode = true
+
 logging.E = "Error"
 logging.W = "Warning"
 logging.I = "Info"

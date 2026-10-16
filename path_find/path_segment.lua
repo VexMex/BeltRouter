@@ -15,7 +15,7 @@ local EntityRoutingAttribute = require("path_find/entity_routing_attribute")
 --- @type ArrayList
 local ArrayList = require("array_list")
 --- @type TransportLineType
-local TransportLineType = require("enum/line_type")
+local TransportLineType = require("enum/transport_types").line
 --- @type DirectionHelper
 local DirectionHelper = require("direction_helper")
 
@@ -51,7 +51,7 @@ function PathSegment:fromLuaEntity(entity, halfUndergroundPipeAsInput)
     local newUnit = PathSegment:new {
         name = entityName,
         position = Vector2D.fromPosition(entity.position),
-        direction = DirectionHelper.convert_direction(entity.direction) or belt_old_directions.north,
+        direction = entity.direction or defines.direction.north,
         distance = 1,
         type = (entity.type == "underground-belt") and entity.belt_to_ground_type
     }

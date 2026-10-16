@@ -4,7 +4,7 @@ local Support = {}
 local modules = {
     "vector2d", "direction_helper", "path_find/entity_routing_attribute",
     "path_find/path_segment", "path_find/path_node", "path_find/min_distance_dict",
-    "transport_line_connector", "position_cache", "async_task", "minheap", "logging"
+    "transport_line_connector", "position_cache", "async_task", "minheap", "logging", "enum/transport_types"
 }
 
 function Support.fresh()
@@ -13,7 +13,6 @@ function Support.fresh()
         north = 0, northeast = 2, east = 4, southeast = 6,
         south = 8, southwest = 10, west = 12, northwest = 14
     } }
-    belt_old_directions = defines.direction
     prototypes = { entity = {} }
     for _, entry in ipairs({ {"transport-belt"}, {"underground-belt", 5}, {"splitter"} }) do
         prototypes.entity[entry[1]] = {
