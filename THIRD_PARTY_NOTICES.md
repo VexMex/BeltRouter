@@ -1,8 +1,8 @@
 # Third-party notices
 
-## Linked-list implementation
+## Historical linked-list implementation
 
-`linked_list.lua` identifies itself as adapted from [iskolbin/linkedlist](https://github.com/iskolbin/linkedlist/blob/master/LinkedList.lua). The original notice is retained in that source file. The upstream [MIT license](https://github.com/iskolbin/linkedlist/blob/master/LICENSE) follows:
+Earlier imported versions included `linked_list.lua`, adapted from [iskolbin/linkedlist](https://github.com/iskolbin/linkedlist/blob/master/LinkedList.lua). That unused file was removed in version 3.1.0. Its historical attribution and the upstream [MIT license](https://github.com/iskolbin/linkedlist/blob/master/LICENSE) are retained below.
 
 The MIT License (MIT)
 

@@ -144,7 +144,6 @@ function SelectionQueue:__clearInvalidSelections()
                 self:removeIndex(i)
             else
 
-                --newEntity.direction = DirectionHelper.convert_direction(newEntity.direction)
                 self.queue[i].entity = newEntity
 
                 i = i + 1

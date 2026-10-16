@@ -11,19 +11,6 @@
 local ArrayList = {}
 ArrayList.__index = ArrayList
 
---- Cast a list to ArrayList but doesn't change its values
---- @generic T: ArrayList
---- @param toCast T listToBeCased
---- @return T
--- Attach list helper methods to an existing table without copying its values.
-function ArrayList.cast(toCast)
-    return setmetatable(toCast, ArrayList)
-end
-
---- Returns a new ArrayList reference that contains all elements in passed in list
---- @generic T: ArrayList
---- @param list T optional
---- @return T
 -- Create an empty list, optionally adding the supplied values.
 function ArrayList.new(list)
     local o = setmetatable({}, ArrayList)
@@ -33,23 +20,7 @@ function ArrayList.new(list)
     return o
 end
 
---- @generic T
---- @param table table<T, any>
---- @return T[]|ArrayList
--- Make a list of a table's keys rather than its values.
-function ArrayList.fromKeys(table)
-    assert(table)
-
-    local o = setmetatable({}, ArrayList)
-    for k, _ in pairs(table) do
-        o:add(k)
-    end
-    return o
-end
-
---- @generic T: self
---- @param val T
--- Append one value and return the list so calls can be chained.
+-- Append one value and return this list.
 function ArrayList:add(val)
     assert(self and val)
 
@@ -57,10 +28,7 @@ function ArrayList:add(val)
     return self
 end
 
---- @generic T
---- @param table table<any, T>|T[]
---- @return ArrayList|T[]
--- Append the supplied table's values; iteration uses pairs, so ordering is not guaranteed.
+-- Append all supplied values; pairs does not promise a sorted order.
 function ArrayList:addAll(table)
     assert(self and table)
 
@@ -68,47 +36,6 @@ function ArrayList:addAll(table)
         ArrayList.add(self, val)
     end
     return self
-end
-
--- Make room by shifting later values to the right, then put the new value at this position.
-function ArrayList:insert(val, pos)
-    assert(self and (val ~= nil))
-    local p = pos or 1
-
-    local i = #self + 1
-    while i > p and i > 1 do
-        self[i] = self[i - 1]
-        i = i - 1
-    end
-    self[p] = val
-end
-
---- @param comp fun(a, b):boolean element goes into the first element with true value returned
--- Insert before the first value accepted by the comparison function, or append at the end.
-function ArrayList:insert_by_order(val, comp)
-    assert(self and (val ~= nil) and comp)
-    for i, list_val in ipairs(self) do
-        if comp(val, list_val) then
-            self:insert(val, i)
-            return
-        end
-    end
-    self:insert(val, #self + 1)
-end
-
---- @generic T
---- @param val T
---- @param eq_func fun(a:T, b:T):boolean
---- @return boolean
--- Look for a matching value, using either the custom comparison or normal equality.
-function ArrayList:has(val, eq_func)
-    assert(self and (val ~= nil))
-    for _, test in pairs(self) do
-        if eq_func and eq_func(val, test) or (val == test) then
-            return true
-        end
-    end
-    return false
 end
 
 -- Remove and return the last value.
@@ -122,7 +49,7 @@ function ArrayList:popRight()
     return element
 end
 
--- Remove the first value and shift the remaining values left to close the gap.
+-- Remove the first value and close the gap by shifting the remaining values.
 function ArrayList:popLeft()
     assert(self)
     local firstElement = self[1]
@@ -136,7 +63,7 @@ function ArrayList:popLeft()
     return firstElement
 end
 
--- Choose between the no-index removal branch and removing a particular numbered entry.
+-- Remove a numbered entry, using the existing no-index branch if no index is supplied.
 function ArrayList:pop(index)
     assert(self)
     if not index then
@@ -152,9 +79,7 @@ function ArrayList:pop(index)
     end
 end
 
---- @param f fun(ele: any):any
---- @return ArrayList
--- Build a new list by applying a function to every value.
+-- Build another list by applying the supplied function to every value.
 function ArrayList:map(f)
     assert(self and f)
     local out = ArrayList.new()
@@ -162,88 +87,6 @@ function ArrayList:map(f)
         out[k] = f(v)
     end
     return out
-end
-
---- @param f fun(ele:any):any, any
--- Let a function turn each value into a key/value pair in a new lookup table.
-function ArrayList:mapToTable(f)
-    assert(self and f)
-    local out = {}
-    for _, v in pairs(self) do
-        local table_key, table_val = f(v)
-        out[table_key] = table_val
-    end
-    return out
-end
-
---- @generic T
---- @param f fun(a:T, b:T):T
--- Combine values one at a time into a single result, starting with the first value.
-function ArrayList:reduce(f)
-    assert(self and f)
-    local val = self[1]
-    for i = 2, #self, 1 do
-        val = f(val, self[i])
-    end
-    return val
-end
-
---- @param f fun(ele: any):boolean
---- @return ArrayList
--- Build a new list containing only values accepted by the supplied function.
-function ArrayList:filter(f)
-    assert(self and f)
-    local out = ArrayList.new()
-    local i = 1
-    for _, v in pairs(self) do
-        if f(v) then
-            out[i] = v
-            i = i + 1
-        end
-    end
-    return out
-end
-
---- @param f fun(ele: any):boolean
---- @return boolean
--- Return true only if every value passes the check; an empty list also returns true.
-function ArrayList:all(f)
-    assert(self and f)
-    f = f or function(x)
-        return x
-    end
-    for _, v in pairs(self) do
-        if not f(v) then
-            return false
-        end
-    end
-    return true
-end
-
---- @param f fun(ele: any):boolean
---- @return boolean
--- Return true as soon as one value passes the check.
-function ArrayList:any(f)
-    f = f or function(x)
-        return x
-    end
-    assert(self and f)
-    for _, v in pairs(self) do
-        if f(v) then
-            return true
-        end
-    end
-    return false
-end
-
--- Build a short text description of the list for inspection.
-function ArrayList:tostring()
-    local keys = ""
-    for k, v in pairs(self) do
-        keys = keys .. tostring(k) .. ": " .. tostring(v) .. ","
-    end
-    keys = "{" .. keys:sub(1, -2) .. "}"
-    return keys
 end
 
 return ArrayList

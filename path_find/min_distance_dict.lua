@@ -14,7 +14,6 @@ local Vector2D = require("vector2d")
 --- @class MinDistanceDict
 --- @type MinDistanceDict
 local MinDistanceDict = {}
-MinDistanceDict.__directionNum = 8
 MinDistanceDict.__index = MinDistanceDict
 
 --- @return MinDistanceDict

@@ -21,9 +21,9 @@ local logging = require("logging")
 --- @type Vector2D
 local Vector2D = require("vector2d")
 --- @type EntityTransportType
-local EntityTransportType = require("enum/entity_transport_type")
+local EntityTransportType = require("enum/transport_types").entity
 --- @type TransportLineType
-local TransportLineType = require("enum/line_type")
+local TransportLineType = require("enum/transport_types").line
 --- @type DirectionHelper
 local DirectionHelper = require("direction_helper")
 --- @type ArrayList

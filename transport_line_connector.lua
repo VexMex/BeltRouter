@@ -24,45 +24,15 @@ local EntityRoutingAttribute = require("path_find/entity_routing_attribute")
 --- @type PathSegment
 local PathSegment = require("path_find/path_segment")
 --- @type TransportLineType
-local TransportLineType = require("enum/line_type")
+local TransportLineType = require("enum/transport_types").line
 --- @type PathNode
 local PathNode = require("path_find/path_node")
 --- @type MinDistanceDict
 local MinDistanceDict = require("path_find/min_distance_dict")
-local release_mode = require("release")
+local release_mode = logging.releaseMode
 local PositionCache = require("position_cache")
 
-local DirectionHelper = {}
-
---- @param entity LuaEntity
---- @return Vector2D
--- Find the tile directly in front of this entity.
-function DirectionHelper.targetPositionOf(entity)
-    return DirectionHelper.targetPosition(entity.position, entity.direction)
-end
-
---- @param position Vector2D
---- @param direction defines.direction
---- @return Vector2D
--- Move one tile from a position in the supplied direction.
-function DirectionHelper.targetPosition(position, direction)
-    return Vector2D.fromPosition(position) + Vector2D.fromDirection(direction or belt_old_directions.north)
-end
-
---- @param position Vector2D
---- @param getEntityFunc fun()
---- @return LuaEntity[] | ArrayList
--- Ask the supplied lookup function for transport pieces on the four neighboring tiles.
-function DirectionHelper.neighboringEntities(position, getEntityFunc)
-    local entities = ArrayList.new()
-    for _, direction in ipairs { belt_old_directions.north, belt_old_directions.east, belt_old_directions.south, belt_old_directions.west } do
-        local entity = getEntityFunc(Vector2D.fromDirection(direction) + position)
-        if entity ~= nil then
-            entities:add(entity)
-        end
-    end
-    return entities
-end
+local DirectionHelper = require("direction_helper")
 
 --- An "Abstract" transport line connector
 --- @class TransportLineConnector
@@ -281,7 +251,7 @@ function TransportLineConnector:testCanPlace(newChain, minDistanceDict, starting
         for testDiff = 1, pathUnit.distance - 2, 1 do
             local testPos = pathUnit.position + Vector2D.fromDirection(pathUnit.direction):scale(testDiff)
             local entityInMiddle = self.getEntityFunc(testPos)
-            if entityInMiddle and (entityInMiddle.name == pathUnit.name) and (((pathUnit.direction or belt_old_directions.north) - entityInMiddle.direction) % defines.direction.south) == 0
+            if entityInMiddle and (entityInMiddle.name == pathUnit.name) and (((pathUnit.direction or defines.direction.north) - entityInMiddle.direction) % defines.direction.south) == 0
             then
                 logging.log("can't cross other entity facing" .. tostring(entityInMiddle.direction), "placing")
                 return false
