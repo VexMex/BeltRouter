@@ -30,6 +30,7 @@ local PathNode = require("path_find/path_node")
 --- @type MinDistanceDict
 local MinDistanceDict = require("path_find/min_distance_dict")
 local release_mode = require("release")
+local PositionCache = require("position_cache")
 
 local DirectionHelper = {}
 
@@ -82,10 +83,16 @@ TransportLineConnector.__index = TransportLineConnector
 -- Store the game callbacks and task manager; these let the planner work without placing things directly.
 function TransportLineConnector.new(canPlaceEntityFunc, placeEntityFunc, getEntityFunc, asyncTaskManager)
     assertNotNull(canPlaceEntityFunc, placeEntityFunc, getEntityFunc, asyncTaskManager)
+    local placementCache = PositionCache.new(canPlaceEntityFunc)
+    local neighborCache = PositionCache.new(getEntityFunc)
     return setmetatable(
-            { canPlaceEntityFunc = canPlaceEntityFunc,
+            { canPlaceEntityFunc = function(position) return placementCache:get(position) end,
               placeEntityFunc = placeEntityFunc,
-              getEntityFunc = getEntityFunc,
+              getEntityFunc = function(position) return neighborCache:get(position) end,
+              resetWorldCache = function()
+                  placementCache:clear()
+                  neighborCache:clear()
+              end,
               asyncTaskManager = asyncTaskManager,
               greedyLevel = 1.05 -- just a initial value, will be overridden by player's own setting
             }, TransportLineConnector)
@@ -107,6 +114,7 @@ end
 -- The local tryFindPath function does a limited batch of work each time it runs.
 function TransportLineConnector:buildTransportLine(startingEntity, endingEntity, asyncTaskManager, additionalConfig, player)
     assertNotNull(self, startingEntity, endingEntity)
+    self.resetWorldCache()
     local function reportToPlayer(text)
         if player then
             player.print(text)
@@ -161,9 +169,25 @@ function TransportLineConnector:buildTransportLine(startingEntity, endingEntity,
     local taskPriority = game.tick
     -- Do one batch now; if work remains, schedule this same function for a later tick.
     local function tryFindPath()
-        local foundPath = false
+        -- The map may have changed since the previous tick. Never reuse world
+        -- answers across batches, even if this task is queued behind another one.
+        self.resetWorldCache()
+        if not startingEntity.valid then
+            reportToPlayer { "error-message.starting-entity-not-valid" }
+            return
+        end
+        if not endingEntity.valid then
+            reportToPlayer { "error-message.ending-entity-not-valid" }
+            return
+        end
+        -- Rotation or movement can leave an endpoint valid but change its connection.
+        if startingUnit ~= PathSegment:fromLuaEntity(startingEntity)
+                or endingUnit ~= PathSegment:fromLuaEntity(endingEntity, true) then
+            reportToPlayer { "error-message.route-no-longer-valid" }
+            return
+        end
         local tryNum = 0
-        while not priorityQueue:isEmpty() and tryNum < batchSize and not foundPath do
+        while not priorityQueue:isEmpty() and tryNum < batchSize do
             --- @type PathNode
             -- Take the lowest-score candidate from the queue.
             local transportChain = priorityQueue:pop().val
@@ -172,9 +196,16 @@ function TransportLineConnector:buildTransportLine(startingEntity, endingEntity,
             end
             -- A valid final connection means the saved route can now be placed.
             if startingUnit:canConnect(transportChain.pathUnit) then
+                -- Parts of this saved route may have been checked on older ticks.
+                -- Refresh all placement/interference checks before building anything.
+                if not self:validatePath(transportChain, startingUnit, endingUnit) then
+                    reportToPlayer { "error-message.route-no-longer-valid" }
+                    return
+                end
                 transportChain:placeAllEntities(self.placeEntityFunc)
                 logging.log("Path find algorithm explored " .. tostring(totalTryNum + tryNum) .. " blocks to find solution")
-                foundPath = true
+                -- Do not create more candidates after the route is already built.
+                return
             end
             -- Extend this route backward and rank each accepted extension by cost plus estimated distance.
             for _, newChain in pairs(self:surroundingCandidates(transportChain, minDistanceDict, startingUnit, endingUnit, additionalConfig)) do
@@ -183,18 +214,16 @@ function TransportLineConnector:buildTransportLine(startingEntity, endingEntity,
             tryNum = tryNum + 1
         end
         totalTryNum = totalTryNum + tryNum
-        if not foundPath then
-            -- No candidates left means this search found no connection under its current rules.
-            if priorityQueue:isEmpty() then
-                self:debug_visited_position(minDistanceDict)
-                reportToPlayer { "error-message.path-find-terminated-early" }
-            -- Stop when the configured work budget is reached, even if candidates remain.
-            elseif totalTryNum >= maxTryNum then
-                self:debug_visited_position(minDistanceDict)
-                reportToPlayer { "error-message.maximum-trial-reached", tostring(maxTryNum) }
-            else
-                asyncTaskManager:pushTask(tryFindPath, taskPriority)
-            end
+        -- No candidates left means this search found no connection under its current rules.
+        if priorityQueue:isEmpty() then
+            self:debug_visited_position(minDistanceDict)
+            reportToPlayer { "error-message.path-find-terminated-early" }
+        -- Stop when the configured work budget is reached, even if candidates remain.
+        elseif totalTryNum >= maxTryNum then
+            self:debug_visited_position(minDistanceDict)
+            reportToPlayer { "error-message.maximum-trial-reached", tostring(maxTryNum) }
+        else
+            asyncTaskManager:pushTask(tryFindPath, taskPriority)
         end
     end
     asyncTaskManager:pushTask(tryFindPath, taskPriority)
@@ -228,9 +257,13 @@ end
 --- @param minDistanceDict MinDistanceDict
 --- @param startingSegment PathSegment
 --- @param endingSegment PathSegment
+--- @param skipCostPruning boolean|nil only true when rechecking a complete route
 -- Reject blocked or interfering segments, then check whether this candidate improves recorded costs.
-function TransportLineConnector:testCanPlace(newChain, minDistanceDict, startingSegment, endingSegment)
-    assertNotNull(self, newChain, minDistanceDict, startingSegment)
+function TransportLineConnector:testCanPlace(newChain, minDistanceDict, startingSegment, endingSegment, skipCostPruning)
+    assertNotNull(self, newChain, startingSegment)
+    if not skipCostPruning then
+        assertNotNull(minDistanceDict)
+    end
     local pathUnit = newChain.pathUnit
     local entityList = pathUnit:toEntitySpecs()
 
@@ -248,7 +281,7 @@ function TransportLineConnector:testCanPlace(newChain, minDistanceDict, starting
         for testDiff = 1, pathUnit.distance - 2, 1 do
             local testPos = pathUnit.position + Vector2D.fromDirection(pathUnit.direction):scale(testDiff)
             local entityInMiddle = self.getEntityFunc(testPos)
-            if entityInMiddle and (entityInMiddle.name == pathUnit.name) and (((pathUnit.direction or belt_old_directions.north) - entityInMiddle.direction) % 4) == 0
+            if entityInMiddle and (entityInMiddle.name == pathUnit.name) and (((pathUnit.direction or belt_old_directions.north) - entityInMiddle.direction) % defines.direction.south) == 0
             then
                 logging.log("can't cross other entity facing" .. tostring(entityInMiddle.direction), "placing")
                 return false
@@ -273,7 +306,9 @@ function TransportLineConnector:testCanPlace(newChain, minDistanceDict, starting
                         and ((not neighborType:isUndergroundBelt()) or (neighbor.belt_to_ground_type == "output"))
                 then
                     if (neighbor.position - startingSegment.position):lInfNorm() > 0.5 then
-                        logging.log("found interfere and avoid building at " .. serpent.line(entity.position), "placing")
+                        if logging.shouldOutput("placing") then
+                            logging.log("found interfere and avoid building at " .. serpent.line(entity.position), "placing")
+                        end
                         return false
                     else
                         closeToFinal = true
@@ -287,7 +322,9 @@ function TransportLineConnector:testCanPlace(newChain, minDistanceDict, starting
                 if neighborType and neighborType.lineType == TransportLineType.fluidLine then
                     if neighborType:isOnGroundPipe() or DirectionHelper.targetPositionOf(neighbor) == entity.position then
                         if (neighbor.position - startingSegment.position):lInfNorm() > 0.5 and (neighbor.position - endingSegment.position):lInfNorm() > 0.5 then
-                            logging.log("found interfere and avoid building at " .. serpent.line(entity.position), "placing")
+                            if logging.shouldOutput("placing") then
+                                logging.log("found interfere and avoid building at " .. serpent.line(entity.position), "placing")
+                            end
                             return false
                         else
                             closeToFinal = true
@@ -302,7 +339,8 @@ function TransportLineConnector:testCanPlace(newChain, minDistanceDict, starting
     if newChain.enforceCollisionCheck then
         -- check the transport chain doesn't collide with itself
         -- TODO: although I've optimized this check only to be done when necessary, this is still costly and performance degrades even more for long+curvy path. Any possibility of optimizing even more?
-        local testPositions = newChain.pathUnit:toEntitySpecs()
+        -- Reuse the placement descriptions already made at the top of this check.
+        local testPositions = entityList
         local testingChain = newChain.prevChain
         while testingChain do
             for _, testSpec in ipairs(testPositions) do
@@ -315,7 +353,8 @@ function TransportLineConnector:testCanPlace(newChain, minDistanceDict, starting
     end
 
     -- Near an endpoint, allow the valid connection without the usual cost-pruning test.
-    if closeToFinal then
+    -- Final validation checks an already chosen route, not its search priority.
+    if skipCostPruning or closeToFinal then
         return true
     else
         -- we only consider those path whose distance could be smaller at the position, like dijkstra algorithm
@@ -333,6 +372,21 @@ function TransportLineConnector:testCanPlace(newChain, minDistanceDict, starting
         end
         return distanceSmallerThanAny
     end
+end
+
+-- Recheck the chosen route against fresh world data. Do not update or consult the
+-- minimum-cost table here: choosing candidates remains the job of the unchanged search.
+function TransportLineConnector:validatePath(transportChain, startingSegment, endingSegment)
+    self.resetWorldCache()
+    local node = transportChain
+    while node and node.prevChain do
+        -- The final node is the already existing destination, not a new placement.
+        if not self:testCanPlace(node, nil, startingSegment, endingSegment, true) then
+            return false
+        end
+        node = node.prevChain
+    end
+    return true
 end
 
 --- A* algorithm's heuristics cost
@@ -370,7 +424,10 @@ function TransportLineConnector:debug_visited_position(minDistanceDict)
                     posDict[key] = posDict[key] or { vector = vector, directions = {} }
                     posDict[key].directions[direction] = val
                 end)
-        local directionMapping = { [0] = "N", [2] = "E", [4] = "S", [6] = "W" }
+        local directionMapping = {
+            [defines.direction.north] = "N", [defines.direction.east] = "E",
+            [defines.direction.south] = "S", [defines.direction.west] = "W"
+        }
         for _, dict in pairs(posDict) do
             local vector = dict.vector
             local text = ""

@@ -105,6 +105,11 @@ local specialTransportLineGroupMapping = {
 --- @type EntityRoutingAttribute
 local EntityRoutingAttribute = {}
 
+-- Game prototypes stay fixed during a running configuration. These module-local
+-- descriptions are rebuilt when Factorio reloads the script; they are not save data.
+-- Treat returned descriptions as shared, read-only data.
+local attributeCache = {}
+
 --- @param k string
 -- Calculate a surface or underground prototype when requested; otherwise look up a normal method.
 function EntityRoutingAttribute.__index(t, k)
@@ -113,9 +118,16 @@ function EntityRoutingAttribute.__index(t, k)
         if prototype == nil then
             log("even more weird")
         end
+        if prototype then
+            rawset(t, k, prototype)
+        end
         return prototype
     elseif k == "undergroundEntityPrototype" then
-        return EntityRoutingAttribute.undergroundVersion(t)
+        local prototype = EntityRoutingAttribute.undergroundVersion(t)
+        if prototype then
+            rawset(t, k, prototype)
+        end
+        return prototype
     end
     return EntityRoutingAttribute[k]
 end
@@ -125,11 +137,19 @@ end
 -- Inspect a piece's game definition to classify it as an item/fluid line and identify its role.
 function EntityRoutingAttribute.from(entity_name)
     assert(entity_name)
+    local cached = attributeCache[entity_name]
+    if cached ~= nil then
+        if cached == false then
+            return nil
+        end
+        return cached
+    end
 
     -- Read the game's definition, rather than guessing solely from the selected entity's name.
     local prototype = prototypes.entity[entity_name]
     if not prototype then
         log("prototype " .. entity_name .. " is not an entity prototype")
+        attributeCache[entity_name] = false
         return nil
     end
     --- @type EntityRoutingAttribute
@@ -142,6 +162,7 @@ function EntityRoutingAttribute.from(entity_name)
     end
     if not type.lineType then
         log("prototype " .. entity_name .. " is neither a belt nor a pipe")
+        attributeCache[entity_name] = false
         return nil
     end
     if type.lineType == TransportLineType.itemLine then
@@ -161,7 +182,11 @@ function EntityRoutingAttribute.from(entity_name)
     end
     type.isUnderground = prototype.max_underground_distance ~= nil
     setmetatable(type, EntityRoutingAttribute)
-    log("type of " .. entity_name .. " is " .. serpent.line(type))
+    attributeCache[entity_name] = type
+    -- Formatting the table costs time even when the logging function hides it.
+    if logging.shouldOutput("transportType") then
+        log("type of " .. entity_name .. " is " .. serpent.line(type))
+    end
     return type
 end
 
@@ -203,7 +228,7 @@ end
 
 --- @return Vector2D[] all points inscribed by the entity, which are snapped to (X.5, Y.5) where X,Y \in integer coordinate
 -- Calculate connection tiles for the piece; splitters and pumps need more than one tile.
--- The direction arithmetic here still uses older direction constants.
+-- Normalize the footprint to a positive axis, using the current game directions.
 function EntityRoutingAttribute:getAllPointPositions(position, direction)
     if not self:isPump() and not self:isSplitter() then
         return { position }
@@ -211,10 +236,10 @@ function EntityRoutingAttribute:getAllPointPositions(position, direction)
     local normalizedStretchDirection = 0
     if self:isPump() then
         -- stretch bounding box along direction
-        normalizedStretchDirection = (direction - 2) % 4 + 2
+        normalizedStretchDirection = (direction - defines.direction.east) % defines.direction.south + defines.direction.east
     elseif self:isSplitter() then
         -- stretch bounding box along perpendicular direction
-        normalizedStretchDirection = direction % 4 + 2
+        normalizedStretchDirection = direction % defines.direction.south + defines.direction.east
     end
     local centerPos = Vector2D.fromPosition(position)
     local startPosDelta = Vector2D.fromDirection(normalizedStretchDirection):scale(0.5):reverse()

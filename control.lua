@@ -80,7 +80,9 @@ local function setStartingTransportLine(player, selectedEntity)
         else
             playerSelectedStartingPositions[player.index]:push(selectedEntity)
             player.print { "info-message.push-entity" }
-            logging.log("Add entity " .. entityName .. " at position " .. serpent.line(selectedEntity.position))
+            if logging.shouldOutput(logging.D) then
+                logging.log("Add entity " .. entityName .. " at position " .. serpent.line(selectedEntity.position))
+            end
         end
     end
 end
@@ -122,7 +124,9 @@ local function setEndingTransportLine(player, selectedEntity, config)
     config.preferGroundModeUndergroundPunishment = settings.get_player_settings(player)["prefer-ground-mode-underground-punishment"].value
     config.preferLongestUnderground = settings.get_player_settings(player)["prefer-longest-underground"].value
     logging.log("preferLongestUnderground = " .. tostring(settings.get_player_settings(player)["prefer-longest-underground"].value))
-    logging.log("build line with config: " .. serpent.line(config))
+    if logging.shouldOutput(logging.D) then
+        logging.log("build line with config: " .. serpent.line(config))
+    end
     local surface = player.surface
     -- Use Factorio's ghost-placement check on a one-tile belt as a general space check.
     -- The force-build option may allow obstacles that can be marked for removal.

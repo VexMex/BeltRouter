@@ -28,90 +28,52 @@ function Vector2D.fromPosition(position)
     return Vector2D.new(position[1] or position.x, position[2] or position.y)
 end
 
+-- Store the eight coordinate pairs once instead of constructing all eight vectors
+-- for every lookup. The returned vector is still a fresh object: callers may edit it.
+local directionOffsets = {
+    [defines.direction.north] = { 0, -1 },
+    [defines.direction.northeast] = { 1, -1 },
+    [defines.direction.east] = { 1, 0 },
+    [defines.direction.southeast] = { 1, 1 },
+    [defines.direction.south] = { 0, 1 },
+    [defines.direction.southwest] = { -1, 1 },
+    [defines.direction.west] = { -1, 0 },
+    [defines.direction.northwest] = { -1, -1 }
+}
+
 --- @param direction defines.direction
 --- @return Vector2D
 -- Convert a compass direction to movement on the map; north decreases y.
 function Vector2D.fromDirection(direction)
     assertNotNull(direction)
-
-
-    -- 1.1
-    --0
-    --North
-    --1
-    --Northeast
-    --2
-    --East
-    --3
-    --Southeast
-    --4
-    --South
-    --5
-    --Southwest
-    --6
-    --West
-    --7
-    --Northwest
-
-    -- 创建一个映射表，将方向映射到对应的二维向量
-    local directionMap = {
-        [defines.direction.north] = Vector2D.new(0, -1),
-        [defines.direction.northeast] = Vector2D.new(1, -1),
-        [defines.direction.east] = Vector2D.new(1, 0),
-        [defines.direction.southeast] = Vector2D.new(1, 1),
-        [defines.direction.south] = Vector2D.new(0, 1),
-        [defines.direction.southwest] = Vector2D.new(-1, 1),
-        [defines.direction.west] = Vector2D.new(-1, 0),
-        [defines.direction.northwest] = Vector2D.new(-1, -1)
-    }
-
-    -- 返回映射表中对应的Vector2D，如果不存在则返回nil
-    return directionMap[direction] or nil
-
-
-    --if direction == 0 then
-    --    return Vector2D.new(0, -1)
-    --elseif direction == 1 then
-    --    return Vector2D.new(1, -1)
-    --elseif direction == 2 then
-    --    return Vector2D.new(1, 0)
-    --elseif direction == 3 then
-    --    return Vector2D.new(1, 1)
-    --elseif direction == 4 then
-    --    return Vector2D.new(0, 1)
-    --elseif direction == 5 then
-    --    return Vector2D.new(-1, 1)
-    --elseif direction == 6 then
-    --    return Vector2D.new(-1, 0)
-    --elseif direction == 7 then
-    --    return Vector2D.new(-1, -1)
-    --else
-    --    return nil
-    --end
+    local offset = directionOffsets[direction]
+    if offset then
+        return Vector2D.new(offset[1], offset[2])
+    end
+    return nil
 end
 
 --- @return defines.direction
--- Convert a unit movement vector to the older 0-to-7 direction numbering.
+-- Convert a unit movement vector using the same game directions as fromDirection().
 function Vector2D:toDirection()
     if self.x == 0 and self.y == -1 then
-        return 0
+        return defines.direction.north
     elseif self.x == 1 and self.y == -1 then
-        return 1
+        return defines.direction.northeast
     elseif self.x == 1 and self.y == 0 then
-        return 2
+        return defines.direction.east
     elseif self.x == 1 and self.y == 1 then
-        return 3
+        return defines.direction.southeast
     elseif self.x == 0 and self.y == 1 then
-        return 4
+        return defines.direction.south
     elseif self.x == -1 and self.y == 1 then
-        return 5
+        return defines.direction.southwest
     elseif self.x == -1 and self.y == 0 then
-        return 6
+        return defines.direction.west
     elseif self.x == -1 and self.y == -1 then
-        return 7
-    else
-        return nil
+        return defines.direction.northwest
     end
+    return nil
 end
 
 --- @return Vector2D
