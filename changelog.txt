@@ -1,4 +1,12 @@
 ---------------------------------------------------------------------------------------------------
+Version: 3.1.1
+Date: 2026.10.17
+  Bugfixes:
+    - Preserve existing blueprint ghosts, including building ghosts, when routing belts and pipes.
+    - Recheck ghost footprints before placement, including with Force Build enabled.
+    - Stop remaining placements if the route becomes blocked or entity creation fails.
+
+---------------------------------------------------------------------------------------------------
 Version: 3.1.0
 Date: 2026.10.17
   Changes:

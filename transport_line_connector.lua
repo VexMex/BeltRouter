@@ -38,6 +38,7 @@ local DirectionHelper = require("direction_helper")
 --- @class TransportLineConnector
 --- @field asyncTaskManager AsyncTaskManager
 --- @field canPlaceEntityFunc fun(position: Vector2D): boolean
+--- @field canPlaceSpecFunc fun(spec: table): boolean
 --- @field placeEntityFunc fun(entity: LuaEntityPrototype)
 --- @field getEntityFunc fun(position: Vector2D): LuaEntity
 --- @field greedyLevel number
@@ -49,15 +50,17 @@ TransportLineConnector.__index = TransportLineConnector
 --- @param canPlaceEntityFunc fun(position: Vector2D): boolean
 --- @param placeEntityFunc fun(entity: LuaEntityPrototype)
 --- @param getEntityFunc fun(position: Vector2D): LuaEntity
+--- @param canPlaceSpecFunc fun(spec: table): boolean optional full-footprint safety check
 --- @return TransportLineConnector
 -- Store the game callbacks and task manager; these let the planner work without placing things directly.
-function TransportLineConnector.new(canPlaceEntityFunc, placeEntityFunc, getEntityFunc, asyncTaskManager)
+function TransportLineConnector.new(canPlaceEntityFunc, placeEntityFunc, getEntityFunc, asyncTaskManager, canPlaceSpecFunc)
     assertNotNull(canPlaceEntityFunc, placeEntityFunc, getEntityFunc, asyncTaskManager)
     local placementCache = PositionCache.new(canPlaceEntityFunc)
     local neighborCache = PositionCache.new(getEntityFunc)
     return setmetatable(
             { canPlaceEntityFunc = function(position) return placementCache:get(position) end,
               placeEntityFunc = placeEntityFunc,
+              canPlaceSpecFunc = canPlaceSpecFunc or function() return true end,
               getEntityFunc = function(position) return neighborCache:get(position) end,
               resetWorldCache = function()
                   placementCache:clear()
@@ -172,7 +175,10 @@ function TransportLineConnector:buildTransportLine(startingEntity, endingEntity,
                     reportToPlayer { "error-message.route-no-longer-valid" }
                     return
                 end
-                transportChain:placeAllEntities(self.placeEntityFunc)
+                if transportChain:placeAllEntities(self.placeEntityFunc) == false then
+                    reportToPlayer { "error-message.route-no-longer-valid" }
+                    return
+                end
                 logging.log("Path find algorithm explored " .. tostring(totalTryNum + tryNum) .. " blocks to find solution")
                 -- Do not create more candidates after the route is already built.
                 return
@@ -239,7 +245,7 @@ function TransportLineConnector:testCanPlace(newChain, minDistanceDict, starting
 
     -- Check every piece that this segment would actually place, not its underground middle.
     for _, entity in ipairs(entityList) do
-        if not self.canPlaceEntityFunc(entity.position) then
+        if not self.canPlaceEntityFunc(entity.position) or not self.canPlaceSpecFunc(entity) then
             return false
         end
     end

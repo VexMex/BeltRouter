@@ -5,6 +5,7 @@
 
 --- @type Copier
 local Copy = require("copy")
+local GhostGuard = require("ghost_guard")
 --- @type Logger
 local logging = require("logging")
 --- @type EntityRoutingAttribute
@@ -114,6 +115,7 @@ local function setEndingTransportLine(player, selectedEntity, config)
         logging.log("build line with config: " .. serpent.line(config))
     end
     local surface = player.surface
+    local ghostGuard = GhostGuard.new(surface)
     -- Use Factorio's ghost-placement check on a one-tile belt as a general space check.
     -- The force-build option may allow obstacles that can be marked for removal.
     local function canPlace(position)
@@ -130,6 +132,10 @@ local function setEndingTransportLine(player, selectedEntity, config)
     --- @param entity LuaEntity
     -- Convert one planned placement into an actual game operation.
     local function place(entity)
+        -- Check again without a cache: build events from other mods may add plans.
+        if not ghostGuard.isClear(entity) then
+            return false
+        end
         -- Work on a copy so placement details do not modify the route stored by the search.
         entity = Copy.deep_copy(entity)
         entity.force = player.force
@@ -141,20 +147,31 @@ local function setEndingTransportLine(player, selectedEntity, config)
         entity.player = player
         -- This tells game to raise build event so that the action could potentially be caught by other mods
         entity.raise_built = true
+        entity.preserve_ghosts_and_corpses = true
         -- checks for colliding trees/cliffs
         -- Mark nearby colliding objects for removal before creating this piece.
         local collidingEntities = surface.find_entities({ { entity.position.x - 0.4, entity.position.y - 0.4 }, { entity.position.x + 0.4, entity.position.y + 0.4 } })
         if collidingEntities then
             for _, collidingEntity in ipairs(collidingEntities) do
-                collidingEntity.order_deconstruction(player.force, player)
+                -- Deconstructing a ghost deletes it immediately. Never do that.
+                if collidingEntity.valid and not GhostGuard.isGhost(collidingEntity) then
+                    collidingEntity.order_deconstruction(player.force, player)
+                end
             end
         end
 
-        surface.create_entity(entity)
+        -- Deconstruction events may also have changed the map since the first check.
+        if not ghostGuard.isClear(entity) then
+            return false
+        end
+        if not surface.create_entity(entity) then
+            return false
+        end
         if not releaseMode then
             player.create_local_flying_text { text = tostring(num), position = entity.position, time_to_live = 100000, speed = 0.000001 }
             num = num + 1
         end
+        return true
     end
     -- Find nearby transport pieces for interference checks, including existing ghosts.
     local function getEntity(position)
@@ -177,7 +194,7 @@ local function setEndingTransportLine(player, selectedEntity, config)
         end
     end
     -- Give the planner the three game callbacks: can place, place, and look up a neighbor.
-    local transportLineConstructor = TransportLineConnector.new(canPlace, place, getEntity, taskManager)
+    local transportLineConstructor = TransportLineConnector.new(canPlace, place, getEntity, taskManager, ghostGuard.isClear)
     transportLineConstructor:buildTransportLine(startingEntity, selectedEntity, taskManager, config, player)
 
     -- set player's last routing config

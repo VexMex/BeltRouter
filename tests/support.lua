@@ -26,6 +26,10 @@ function Support.fresh()
         fluid_capacity = 100, max_underground_distance = 10
     }
     prototypes.entity.pump = { name = "pump", type = "pump", fluid_capacity = 100 }
+    for _, prototype in pairs(prototypes.entity) do
+        prototype.collision_box = {left_top={x=-0.4,y=-0.4},right_bottom={x=0.4,y=0.4}}
+    end
+    prototypes.entity.pump.collision_box = {left_top={x=-0.29,y=-0.9},right_bottom={x=0.29,y=0.9}}
     local env = {
         messages = {}, placed = {}, blocked = {}, existing = {},
         canCalls = 0, getCalls = 0, serializations = 0, expansions = 0,

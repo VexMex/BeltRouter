@@ -102,15 +102,19 @@ function PathNode:placeAllEntities(placeFunc)
     -- Skip the node without a previous link: it is the destination already present in the world.
     local place = function(entity)
         if transportChain.prevChain ~= nil then
-            placeFunc(entity)
+            return placeFunc(entity)
         end
     end
     while transportChain ~= nil do
         for _, entitySpec in ipairs(transportChain.pathUnit:toEntitySpecs()) do
-            place(entitySpec)
+            -- Stop the remaining placements if a fresh safety check failed.
+            if place(entitySpec) == false then
+                return false
+            end
         end
         transportChain = transportChain.prevChain
     end
+    return true
 end
 
 -- Print this segment and then follow the saved links to print the rest of the candidate route.
