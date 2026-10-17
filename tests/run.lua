@@ -219,11 +219,12 @@ test("control entry point connects player selections and places ghosts", functio
     env.player.surface={
         can_place_entity=function(spec) return env.canPlace(spec.position) end,
         find_entities_filtered=function(spec)
+            if spec.area then return {} end
             local entity=env.getEntity(spec.position)
             return entity and {entity} or {}
         end,
         find_entities=function(_) return {} end,
-        create_entity=function(spec) env.place(spec) end
+        create_entity=function(spec) env.place(spec); return {valid=true} end
     }
     game.players={[1]=env.player}
     package.loaded.control=nil
@@ -246,4 +247,5 @@ test("control entry point connects player selections and places ghosts", functio
     end
 end)
 
+require("tests/ghost_protection")(test, eq, Support)
 print("Passed " .. total .. " tests.")

@@ -1,6 +1,6 @@
 # BeltRouter Lite
 
-Current version: **3.1.0**.
+Current version: **3.1.1**.
 
 Factorio mod for automatically routing belts and pipes. Imported version: **2.7.0**, for Factorio **2.0**. The mod's original name, attribution and images are preserved. English comments explain the Lua files for readers new to the project. The routing implementation includes allocation and caching improvements while keeping the backward Weighted A* search and its existing settings.
 
@@ -39,4 +39,16 @@ Start with `control.lua` for player input and placement, then `transport_line_co
 Direction offsets and transport descriptions are reused instead of rebuilt in the inner search loop. Map-query caches are separate for each route and cleared before every search batch. Before placing any pieces, the chosen route is checked again using fresh world data; changed or deleted endpoints cancel the outdated connection.
 
 The pathfinding algorithm, heuristic weight, route costs and candidate-pruning policy are retained. No path-finding setting or scheduler setting was raised: the default remains **15 search steps per tick**. Run the standalone Lua 5.2 regression suite with `lua tests/run.lua`; see [tests/README.md](tests/README.md) for scope and limitations.
+
+Existing entity ghosts are protected even with Force Build enabled. `ghost_guard.lua`
+checks the planned piece's rotated collision footprint against nearby blueprint ghosts,
+including large building ghosts whose centers lie outside that footprint. Underground
+routes may pass beneath building plans if their endpoints remain clear. Selected
+start and destination ghosts are reused as connection points, without replacing them.
+
+The completed route is checked before placement, and each piece is checked again
+immediately before it is created. Entity and tile ghosts are never marked for
+deconstruction. If another mod adds an obstruction during placement, remaining
+pieces are cancelled; pieces already placed are retained. Entity creation also
+requests that Factorio preserve existing ghosts and corpses.
 
